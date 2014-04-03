@@ -6,12 +6,14 @@ require 'file_loading'
 require 'hash_addition'
 require 'locale_file_iteration'
 
+CONFIG_FILE_PATH = File.join(Dir.pwd, 'config','i18n_cli.yml')
+
 def import_config
-  config_path = File.join(Dir.pwd, 'config','i18n_cli.yml')
-  if (File.exist?(config_path))
-    @config = YAML::load_file(config_path)
+  if (File.exist?(CONFIG_FILE_PATH))
+    @config = YAML::load_file(CONFIG_FILE_PATH)
   else
-    raise "no config/i18n_cli.yml file"
+    puts "file #{CONFIG_FILE_PATH} does not exists. Try to run i18n-cli setup."
+    exit
   end
 end
 
@@ -20,7 +22,7 @@ def import(opts={})
   inbox_path = File.join(Dir.pwd, 'config','inbox')
   locales = opts[:locales]
   if (locales.nil?)
-    locales = @config['locales']
+    locales = @config[:locales]
   end           
   locales.split(':').each do |locale|
     Dir.entries(File.join(inbox_path, locale)).each do |source_file|
@@ -30,7 +32,7 @@ def import(opts={})
         targetname = basename.gsub(/^\d+\./, '')
         imported_folder_path = File.join(inbox_path, locale, 'imported')
         diff = FileLoading.load(source_path)
-        rails_target_path = File.join(@config['rails_locale_path'],targetname)
+        rails_target_path = File.join(@config[:rails_locale_path],targetname)
         rails_target = FileLoading.load(rails_target_path)
         rails_target.deep_merge!(diff)
         FileLoading.save(rails_target,locale,rails_target_path)
@@ -45,16 +47,16 @@ def export(opts={})
   import_config
   outbox_path = File.join(Dir.pwd, 'config', 'outbox')
   inbox_path = File.join(Dir.pwd, 'config', 'inbox')
-  Dir.entries(@config['rails_locale_path']).each do |source_file|
-    source_path = File.join(@config['rails_locale_path'],source_file)
-    if (!File.directory?(source_path) && source_file.match(/en\.yml$/) && !@config['ignored_files'].include?(source_file))
+  Dir.entries(@config[:rails_locale_path]).each do |source_file|
+    source_path = File.join(@config[:rails_locale_path],source_file)
+    if (!File.directory?(source_path) && source_file.match(/en\.yml$/) && !@config[:ignored_files].include?(source_file))
       basename = File.basename(source_file)
       p "base file is #{basename}"
       new_source = FileLoading.load(source_path)
       p "conf is #{@config}"
       locales = opts[:locales]
       if (locales.nil?)
-        locales = @config['locales']
+        locales = @config[:locales]
       end        
       locales.split(':').each do |locale|
         diffs = {}
@@ -77,7 +79,7 @@ def export(opts={})
         FileUtils.cp(source_path, previous_source_path)
 
         #then we want to extract keys that ar missing from the target (new keys)
-        target_path = File.join(@config['rails_locale_path'],target_basename)
+        target_path = File.join(@config[:rails_locale_path],target_basename)
         if (File.exist?(target_path))
           target = FileLoading.load(target_path)
         else
@@ -97,9 +99,22 @@ end
 
 opts = Slop.parse(help: true, strict: true) do
   on '-v', 'Print the version' do
-    puts "Version 1.0"
+    puts "Version 0.0.2"
   end
 
+  command 'setup' do
+    run do |opts, args|
+      if (!File.exists?(CONFIG_FILE_PATH))
+        File.open(CONFIG_FILE_PATH, 'w') do |f|
+          f.write({
+              locales: 'fr',
+              rails_locale_path: File.join(Dir.pwd, 'config','locales'),
+              ignored_files: ''
+            }.to_yaml)
+        end
+      end
+    end    
+  end  
   command 'import' do
     on :v, :verbose, 'Enable verbose mode'
     on :l=, :locales=, 'locales to import separated by :'
