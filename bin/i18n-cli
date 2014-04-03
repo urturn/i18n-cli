@@ -1,0 +1,119 @@
+#!/usr/bin/env ruby
+
+require 'slop'
+require 'yaml'
+require 'file_loading'
+require 'hash_addition'
+require 'locale_file_iteration'
+
+def import_config
+  config_path = File.join(Dir.pwd, 'config','i18n_cli.yml')
+  if (File.exist?(config_path))
+    @config = YAML::load_file(config_path)
+  else
+    raise "no config/i18n_cli.yml file"
+  end
+end
+
+def import(opts={})
+  import_config
+  inbox_path = File.join(Dir.pwd, 'config','inbox')
+  locales = opts[:locales]
+  if (locales.nil?)
+    locales = @config['locales']
+  end           
+  locales.split(':').each do |locale|
+    Dir.entries(File.join(inbox_path, locale)).each do |source_file|
+      source_path = File.join(inbox_path, locale,source_file)
+      if (!File.directory?(source_path))
+        basename = File.basename(source_file)
+        targetname = basename.gsub(/^\d+\./, '')
+        imported_folder_path = File.join(inbox_path, locale, 'imported')
+        diff = FileLoading.load(source_path)
+        rails_target_path = File.join(@config['rails_locale_path'],targetname)
+        rails_target = FileLoading.load(rails_target_path)
+        rails_target.deep_merge!(diff)
+        FileLoading.save(rails_target,locale,rails_target_path)
+        FileUtils.mkdir_p(imported_folder_path)
+        FileUtils.mv(source_path, File.join(imported_folder_path, basename))
+      end
+    end
+  end
+end
+
+def export(opts={})
+  import_config
+  outbox_path = File.join(Dir.pwd, 'config', 'outbox')
+  inbox_path = File.join(Dir.pwd, 'config', 'inbox')
+  Dir.entries(@config['rails_locale_path']).each do |source_file|
+    source_path = File.join(@config['rails_locale_path'],source_file)
+    if (!File.directory?(source_path) && source_file.match(/en\.yml$/) && !@config['ignored_files'].include?(source_file))
+      basename = File.basename(source_file)
+      p "base file is #{basename}"
+      new_source = FileLoading.load(source_path)
+      p "conf is #{@config}"
+      locales = opts[:locales]
+      if (locales.nil?)
+        locales = @config['locales']
+      end        
+      locales.split(':').each do |locale|
+        diffs = {}
+        news = {}
+        FileUtils.mkdir_p(File.join(outbox_path, locale))        
+        target_basename = basename.gsub('en.yml', "#{locale}.yml")
+        p "check locale #{locale}"
+        #first we want to extract diff between last export and new version (modified keys)
+        previous_source_path = File.join(outbox_path, locale, basename)
+        if File.exists?(previous_source_path)
+          p "extract diff"
+          previous_source = FileLoading.load(previous_source_path)
+          LocaleFileIteration.extract_diffs(new_source, previous_source, diffs)
+          if (!diffs.empty?)
+            new_path = File.join(outbox_path, locale, 'diff', "#{Time.now.to_i}.#{target_basename}")
+            FileUtils.mkdir_p(File.dirname(new_path))
+            FileLoading.save(diffs,locale,new_path)
+          end
+        end
+        FileUtils.cp(source_path, previous_source_path)
+
+        #then we want to extract keys that ar missing from the target (new keys)
+        target_path = File.join(@config['rails_locale_path'],target_basename)
+        if (File.exist?(target_path))
+          target = FileLoading.load(target_path)
+        else
+          target = {}
+        end
+        p "extract new"
+        LocaleFileIteration.add_missing(new_source, target, news)
+        if (!news.empty?)
+          new_path = File.join(outbox_path, locale, 'new', target_basename)
+          FileUtils.mkdir_p(File.dirname(new_path))
+          FileLoading.save(news,locale,new_path)
+        end
+      end
+    end
+  end
+end
+
+opts = Slop.parse(help: true, strict: true) do
+  on '-v', 'Print the version' do
+    puts "Version 1.0"
+  end
+
+  command 'import' do
+    on :v, :verbose, 'Enable verbose mode'
+    on :l=, :locales=, 'locales to import separated by :'
+
+    run do |opts, args|
+      import(opts)
+    end
+  end
+  command 'export' do
+    on :v, :verbose, 'Enable verbose mode'
+    on :l=, :locales=, 'locales to export separated by :'
+
+    run do |opts, args|
+      export(opts)
+    end
+  end  
+end
