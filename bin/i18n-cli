@@ -51,9 +51,7 @@ def export(opts={})
     source_path = File.join(@config[:rails_locale_path],source_file)
     if (!File.directory?(source_path) && source_file.match(/en\.yml$/) && !@config[:ignored_files].include?(source_file))
       basename = File.basename(source_file)
-      p "base file is #{basename}"
       new_source = FileLoading.load(source_path)
-      p "conf is #{@config}"
       locales = opts[:locales]
       if (locales.nil?)
         locales = @config[:locales]
@@ -61,13 +59,11 @@ def export(opts={})
       locales.split(':').each do |locale|
         diffs = {}
         news = {}
-        FileUtils.mkdir_p(File.join(outbox_path, locale))        
+        FileUtils.mkdir_p(File.join(outbox_path, locale, 'source'))        
         target_basename = basename.gsub('en.yml', "#{locale}.yml")
-        p "check locale #{locale}"
         #first we want to extract diff between last export and new version (modified keys)
-        previous_source_path = File.join(outbox_path, locale, basename)
+        previous_source_path = File.join(outbox_path, locale, 'source', basename)
         if File.exists?(previous_source_path)
-          p "extract diff"
           previous_source = FileLoading.load(previous_source_path)
           LocaleFileIteration.extract_diffs(new_source, previous_source, diffs)
           if (!diffs.empty?)
@@ -85,7 +81,6 @@ def export(opts={})
         else
           target = {}
         end
-        p "extract new"
         LocaleFileIteration.add_missing(new_source, target, news)
         if (!news.empty?)
           new_path = File.join(outbox_path, locale, 'new', target_basename)
@@ -109,7 +104,7 @@ opts = Slop.parse(help: true, strict: true) do
           f.write({
               locales: 'fr',
               rails_locale_path: File.join(Dir.pwd, 'config','locales'),
-              ignored_files: ''
+              ignored_files: []
             }.to_yaml)
         end
       end
