@@ -68,3 +68,10 @@ So, basically, for each language you have have 3 sub folders:
 So you need to send all files from diffs and news folder to your translator.
 
 ###Import sub command
+Once your translators return you the translated files, you need to import them into your rails app.
+First create a folder inbox inside your Rails App and for each language create a folder with the locale name and put inside this folder all translated files. And run following command
+```
+$ i18n-cli import -l fr
+```
+
+It will import files into the corrrsponding files of your Rails App.
