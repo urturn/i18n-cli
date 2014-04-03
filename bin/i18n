@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+
 require 'slop'
 require 'file_loading'
 require 'hash_addition'

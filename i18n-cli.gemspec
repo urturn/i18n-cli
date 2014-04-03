@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name        = 'i18n-cli'
-  s.version     = '0.0.1'
+  s.version     = '0.0.2'
   s.date        = '2014-04-03'
   s.summary     = "A client line interface to manage i18n files for rails"
   s.description = "A client line interface to manage i18n files for rails"
