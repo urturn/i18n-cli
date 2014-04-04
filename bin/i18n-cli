@@ -2,6 +2,7 @@
 
 require 'slop'
 require 'yaml'
+require 'active_support/core_ext/hash/deep_merge.rb'
 require 'file_loading'
 require 'hash_addition'
 require 'locale_file_iteration'
