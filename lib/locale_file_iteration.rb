@@ -3,7 +3,7 @@ module LocaleFileIteration
     key_modified = false
     new.each do |k,v|
       value = v
-      if value.is_a?(Hash)
+      if value.is_a?(Hash) && source
         dest[k] ||= {}
         deep_modified = extract_diffs(value, source[k], dest[k])
         if !deep_modified
